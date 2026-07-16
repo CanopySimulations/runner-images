@@ -17,10 +17,26 @@ for package in $common_packages; do
 
         tcl-tk@8)
             brew_smart_install "$package"
-            if is_VenturaX64 || is_SonomaX64 || is_SequoiaX64; then
+            if is_SonomaX64 || is_SequoiaX64 || is_TahoeX64; then
                 # Fix for https://github.com/actions/runner-images/issues/11074
                 ln -sf "$(brew --prefix tcl-tk@8)/lib/libtcl8.6.dylib" /usr/local/lib/libtcl8.6.dylib
                 ln -sf "$(brew --prefix tcl-tk@8)/lib/libtk8.6.dylib" /usr/local/lib/libtk8.6.dylib
+            fi
+            ;;
+
+        xcodes)
+            if is_SequoiaArm64 || is_TahoeArm64; then
+                # xcodes formulae still works on MacOS 15 ARM and 26 ARM
+                brew_smart_install "$package"
+            else
+                # homebrew-core ships no x86_64 bottle for current xcodes, and building it
+                # from source needs xcbuild (unavailable during image build). Install the
+                # prebuilt Developer-ID-signed universal binary from XcodesOrg's release.
+                echo "Installing xcodes from XcodesOrg release..."
+                curl -fsSL "https://github.com/XcodesOrg/xcodes/releases/latest/download/xcodes.zip" -o /tmp/xcodes.zip
+                unzip -oq /tmp/xcodes.zip -d /tmp/xcodes-bin
+                sudo install -m 0755 /tmp/xcodes-bin/xcodes /usr/local/bin/xcodes
+                rm -rf /tmp/xcodes.zip /tmp/xcodes-bin
             fi
             ;;
 
@@ -42,22 +58,19 @@ for package in $cask_packages; do
 done
 
 # Load "Parallels International GmbH"
-if is_SonomaX64 || is_VenturaX64 || is_SequoiaX64; then
+if is_SonomaX64 || is_SequoiaX64; then
     sudo kextload /Applications/Parallels\ Desktop.app/Contents/Library/Extensions/10.9/prl_hypervisor.kext || true
 fi
 
 # Execute AppleScript to change security preferences for macOS12, macOS13, macOS14 and macOS15
 # System Preferences -> Security & Privacy -> General -> Unlock -> Allow -> Not now
-if is_SonomaX64 || is_VenturaX64 || is_SequoiaX64; then
+if is_SonomaX64 || is_SequoiaX64; then
     for retry in {4..0}; do
         echo "Executing AppleScript to change security preferences. Retries left: $retry"
         {
             set -e
-            osascript -e 'tell application "System Events" to get application processes where visible is true'
-            if is_VenturaX64; then
-                osascript $HOME/utils/confirm-identified-developers-macos13.scpt $USER_PASSWORD
-            fi    
-            
+            osascript -e 'tell application "System Events" to get application processes where visible is true' 
+
             if is_SonomaX64; then
                 osascript $HOME/utils/confirm-identified-developers-macos14.scpt $USER_PASSWORD
             fi
@@ -65,6 +78,7 @@ if is_SonomaX64 || is_VenturaX64 || is_SequoiaX64; then
             if is_SequoiaX64; then
                 osascript $HOME/utils/confirm-identified-developers-macos15.scpt $USER_PASSWORD
             fi
+
         } && break
 
         if [[ $retry -eq 0 ]]; then
@@ -78,7 +92,7 @@ if is_SonomaX64 || is_VenturaX64 || is_SequoiaX64; then
 fi
 
 # Validate "Parallels International GmbH" kext
-if is_SonomaX64 || is_VenturaX64 || is_SequoiaX64; then
+if is_SonomaX64 || is_SequoiaX64; then
 
     echo "Closing System Settings window if it is still opened"
     killall "System Settings" || true

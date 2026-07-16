@@ -9,13 +9,22 @@
 source $HELPER_SCRIPTS/install.sh
 source $HELPER_SCRIPTS/os.sh
 
+if is_x64; then
+  docker_arch="amd64"
+elif is_arm64; then
+  docker_arch="arm64"
+else
+  echo "Unsupported architecture"
+  exit 1
+fi
+
 REPO_URL="https://download.docker.com/linux/ubuntu"
 GPG_KEY="/usr/share/keyrings/docker.gpg"
 REPO_PATH="/etc/apt/sources.list.d/docker.list"
 os_codename=$(lsb_release -cs)
 
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o $GPG_KEY
-echo "deb [arch=amd64 signed-by=$GPG_KEY] $REPO_URL ${os_codename} stable" > $REPO_PATH
+echo "deb [arch=$docker_arch signed-by=$GPG_KEY] $REPO_URL ${os_codename} stable" > $REPO_PATH
 apt-get update
 
 # Install docker components which available via apt-get
@@ -65,14 +74,21 @@ systemctl is-enabled --quiet docker.service || systemctl enable docker.service
 sleep 10
 docker info
 
-# Pull Dependabot docker image
 if ! is_ubuntu22; then
+    # Pull Dependabot docker image
     docker pull ghcr.io/dependabot/dependabot-updater-core:latest
+
+    # Pull AW docker images
+    docker pull ghcr.io/github/gh-aw-mcpg:latest
+    docker pull ghcr.io/github/gh-aw-firewall/agent:latest
+    docker pull ghcr.io/github/gh-aw-firewall/api-proxy:latest
+    docker pull ghcr.io/github/gh-aw-firewall/squid:latest
+    docker pull ghcr.io/github/github-mcp-server:latest
 fi
 
 # Download amazon-ecr-credential-helper
 aws_latest_release_url="https://api.github.com/repos/awslabs/amazon-ecr-credential-helper/releases/latest"
-aws_helper_url=$(curl -fsSL "${aws_latest_release_url}" | jq -r '.body' | awk -F'[()]' '/linux-amd64/ {print $2}')
+aws_helper_url=$(curl -fsSL "${aws_latest_release_url}" | jq -r '.body' | awk -F'[()]' '/linux-'"${docker_arch}"'/ {print $2}')
 aws_helper_binary_path=$(download_with_retry "$aws_helper_url")
 
 # Supply chain security - amazon-ecr-credential-helper
