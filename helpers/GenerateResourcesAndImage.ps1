@@ -7,6 +7,7 @@ enum ImageType {
     Ubuntu2204          = 4
     Ubuntu2404          = 5
     Ubuntu2604          = 6
+    Ubuntu2604_arm64    = 7
 }
 
 Function Get-PackerTemplate {
@@ -43,6 +44,11 @@ Function Get-PackerTemplate {
             $relativeTemplatePath = Join-Path (Join-Path "ubuntu" "templates") "build.ubuntu-26_04.pkr.hcl"
             $imageOS = "ubuntu26"
         }
+        ([ImageType]::Ubuntu2604_arm64) {
+            $relativeTemplatePath = Join-Path (Join-Path "ubuntu" "templates") "build.ubuntu-26_04-arm64.pkr.hcl"
+            $imageOS = "ubuntu26-arm64"
+            $vmSize = "Standard_D4ps_v6"
+        }
         default { throw "Unknown type of image" }
     }
 
@@ -58,6 +64,7 @@ Function Get-PackerTemplate {
         "BuildName" = $buildName
         "ImageOS"   = $imageOS
         "Path"      = [IO.Path]::GetDirectoryName($imageTemplatePath)
+        "VMSize"    = $vmSize 
     }
 }
 
@@ -283,6 +290,7 @@ Function GenerateResourcesAndImage {
         "-var=install_password=$($InstallPassword)" `
         "-var=allowed_inbound_ip_addresses=$($AllowedInboundIpAddresses)" `
         "-var=azure_tags=$($TagsJson)" `
+        "-var=vm_size=$($PackerTemplate.VMSize ?? 'Standard_D4s_v6')" `
         $PackerTemplate.Path
 
     if ($LastExitCode -ne 0) {
@@ -385,6 +393,7 @@ Function GenerateResourcesAndImage {
             -var "install_password=$($InstallPassword)" `
             -var "allowed_inbound_ip_addresses=$($AllowedInboundIpAddresses)" `
             -var "azure_tags=$($TagsJson)" `
+            -var "vm_size=$($PackerTemplate.VMSize ?? 'Standard_D4s_v6')" `
             $PackerTemplate.Path
 
         if ($LastExitCode -ne 0) {
